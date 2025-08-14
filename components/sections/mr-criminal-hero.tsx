@@ -1,27 +1,54 @@
 "use client"
 
-import { Suspense } from "react"
-import { Canvas } from "@react-three/fiber"
-import { OrbitControls, useGLTF } from "@react-three/drei"
+import { Suspense, useRef } from "react"
+import { Canvas, useFrame } from "@react-three/fiber"
+import { OrbitControls, useGLTF, Environment, Bounds } from "@react-three/drei"
 import { Button } from "@/components/ui/button"
+import { a as three } from "@react-spring/three"
+import { a as web } from "@react-spring/web"
 
 // This component loads and displays your 3D model
 function ModelViewer() {
-  // This line now points to your uploaded .glb file
   const { scene } = useGLTF("/models/hero-model.glb")
-  
-  // You can adjust the scale and position to fit your scene perfectly
-  return <primitive object={scene} scale={1.8} position={[0, -1.5, 0]} />
+  return <primitive object={scene} />
 }
 
 // Preload the model for faster loading times
 useGLTF.preload("/models/hero-model.glb")
 
 
+// This component contains the logic for the cursor-following effect
+function Scene() {
+  const sceneRef = useRef<any>()
+
+  // This hook runs on every frame, allowing us to update the scene
+  useFrame(({ mouse, viewport }) => {
+    if (sceneRef.current) {
+      // Calculate the rotation based on mouse position
+      const x = (mouse.x * viewport.width) / 100
+      const y = (mouse.y * viewport.height) / 100
+      
+      // Apply a subtle rotation to the whole scene
+      sceneRef.current.rotation.y = x
+      sceneRef.current.rotation.x = -y
+    }
+  })
+
+  return (
+    <three.group ref={sceneRef}>
+      {/* Bounds will auto-center and scale your model */}
+      <Bounds fit clip observe margin={1.2}>
+        <ModelViewer />
+      </Bounds>
+    </three.group>
+  )
+}
+
+
 export default function MrCriminalHero() {
   return (
-    <section id="hero" className="relative h-screen w-full overflow-hidden bg-[#050807] text-white">
-      {/* Background grid/glow */}
+    <section id="hero" className="relative w-full overflow-hidden bg-[#050807] text-white">
+      {/* Background is now fixed and will not interfere with scrolling */}
       <div className="pointer-events-none absolute inset-0 z-0">
         <div
           className="absolute inset-0 opacity-30"
@@ -40,8 +67,8 @@ export default function MrCriminalHero() {
         </svg>
       </div>
 
-      {/* Grid layout for text and 3D model */}
-      <div className="relative z-10 mx-auto grid h-full max-w-7xl grid-cols-1 items-center gap-10 px-6 md:grid-cols-2">
+      {/* Main content area that allows scrolling */}
+      <div className="relative z-10 mx-auto grid min-h-screen grid-cols-1 items-center gap-10 px-6 md:grid-cols-2">
         
         {/* Left Column: Text Content */}
         <div className="flex flex-col items-center text-center md:items-start md:text-left">
@@ -49,8 +76,7 @@ export default function MrCriminalHero() {
             Hunt Bugs Like a <span className="text-primary-green animate-pulse">Cyber Warrior</span>
           </h1>
           <p className="mt-4 max-w-xl text-lg text-primary-green/80">
-            Discover vulnerabilities with AI-powered scanning, real-time analysis, and gamified learning. Join thousands
-            of security professionals advancing their skills.
+            Discover vulnerabilities with AI-powered scanning, real-time analysis, and gamified learning.
           </p>
           <div className="mt-8 flex items-center gap-4">
             <Button asChild className="cyber-button">
@@ -66,20 +92,19 @@ export default function MrCriminalHero() {
           </div>
         </div>
 
-        {/* Right Column: 3D Animation Canvas */}
-        <div className="h-full w-full min-h-[400px] md:min-h-0 cursor-grab active:cursor-grabbing">
-          <Canvas camera={{ position: [0, 0, 5], fov: 50 }}>
-            {/* Lighting for the scene to make the model visible and look good */}
-            <ambientLight intensity={1.5} />
-            <pointLight position={[10, 10, 10]} intensity={200} color="#00ff55" />
-            <pointLight position={[-10, -10, -10]} intensity={100} color="#ffffff" />
+        {/* Right Column: 3D Model in a "Box" */}
+        <div className="h-[60vh] w-full rounded-2xl border border-primary-green/20 bg-gradient-to-br from-black/30 to-primary-green/5 shadow-2xl backdrop-blur-sm">
+          <Canvas camera={{ position: [0, 0, 4], fov: 50 }}>
+            {/* Improved lighting for better model appearance */}
+            <ambientLight intensity={0.5} />
+            <Environment preset="city" />
             
             <Suspense fallback={null}>
-              <ModelViewer />
+              <Scene />
             </Suspense>
             
-            {/* Controls allow users to rotate and zoom with their mouse */}
-            <OrbitControls enableZoom={true} enablePan={false} autoRotate autoRotateSpeed={0.8} />
+            {/* OrbitControls are disabled to allow for the cursor follow effect */}
+            <OrbitControls enableZoom={false} enablePan={false} enableRotate={false} />
           </Canvas>
         </div>
         
