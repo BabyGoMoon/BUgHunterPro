@@ -1,5 +1,5 @@
 import { Header } from "@/components/layout/header"
-import { HeroSection } from "@/components/sections/hero-section"
+import MrCriminalHero from "@/components/sections/mr-criminal-hero"
 import { ToolsSection } from "@/components/sections/tools-section"
 import { FeaturesSection } from "@/components/sections/features-section"
 import { TestimonialsSection } from "@/components/sections/testimonials-section"
@@ -11,7 +11,7 @@ export default function HomePage() {
     <div className="min-h-screen bg-background">
       <Header />
       <main>
-        <HeroSection />
+        <MrCriminalHero />
         <ToolsSection />
         <FeaturesSection />
         <TestimonialsSection />
