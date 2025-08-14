@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Search, Download, Copy, ExternalLink, Shield, Globe } from "lucide-react";
-import SubdomainScannerProgress from "./subdomain-scanner-progress";
+import SubdomainScannerProgress from "./subdomain-scanner-progress.tsx"; // <--- THIS LINE IS THE FIX
 
 interface SubdomainResult {
   subdomain: string;
