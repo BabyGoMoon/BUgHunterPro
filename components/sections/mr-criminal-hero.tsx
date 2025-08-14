@@ -1,29 +1,28 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { Suspense } from "react"
+import { Canvas } from "@react-three/fiber"
+import { OrbitControls, useGLTF } from "@react-three/drei"
 import { Button } from "@/components/ui/button"
 
+// This component loads and displays your 3D model
+function ModelViewer() {
+  // This line now points to your uploaded .glb file
+  const { scene } = useGLTF("/models/hero-model.glb")
+  
+  // You can adjust the scale and position to fit your scene perfectly
+  return <primitive object={scene} scale={1.8} position={[0, -1.5, 0]} />
+}
+
+// Preload the model for faster loading times
+useGLTF.preload("/models/hero-model.glb")
+
+
 export default function MrCriminalHero() {
-  const heroRef = useRef<HTMLElement>(null)
-
-  useEffect(() => {
-    // Simple scroll effect without GSAP
-    const handleScroll = () => {
-      if (heroRef.current) {
-        const scrolled = window.scrollY
-        const rate = scrolled * -0.5
-        heroRef.current.style.transform = `translateY(${rate}px)`
-      }
-    }
-
-    window.addEventListener("scroll", handleScroll)
-    return () => window.removeEventListener("scroll", handleScroll)
-  }, [])
-
   return (
-    <section ref={heroRef} id="hero" className="relative min-h-screen w-full overflow-hidden bg-[#050807] text-white">
+    <section id="hero" className="relative h-screen w-full overflow-hidden bg-[#050807] text-white">
       {/* Background grid/glow */}
-      <div className="pointer-events-none absolute inset-0">
+      <div className="pointer-events-none absolute inset-0 z-0">
         <div
           className="absolute inset-0 opacity-30"
           style={{
@@ -41,10 +40,11 @@ export default function MrCriminalHero() {
         </svg>
       </div>
 
-      {/* Content */}
-      <div className="relative z-10 mx-auto flex max-w-7xl flex-col items-center gap-10 px-6 py-16 md:flex-row md:py-24">
-        {/* Copy */}
-        <div className="md:w-1/2">
+      {/* Grid layout for text and 3D model */}
+      <div className="relative z-10 mx-auto grid h-full max-w-7xl grid-cols-1 items-center gap-10 px-6 md:grid-cols-2">
+        
+        {/* Left Column: Text Content */}
+        <div className="flex flex-col items-center text-center md:items-start md:text-left">
           <h1 className="text-4xl font-extrabold leading-tight md:text-6xl">
             Hunt Bugs Like a <span className="text-primary-green animate-pulse">Cyber Warrior</span>
           </h1>
@@ -52,23 +52,6 @@ export default function MrCriminalHero() {
             Discover vulnerabilities with AI-powered scanning, real-time analysis, and gamified learning. Join thousands
             of security professionals advancing their skills.
           </p>
-
-          {/* Stats */}
-          <div className="mt-6 grid grid-cols-3 gap-4 text-center">
-            <div className="glass-panel p-3">
-              <div className="text-2xl font-bold text-primary-green">50,000+</div>
-              <div className="text-xs text-muted-foreground">Vulnerabilities</div>
-            </div>
-            <div className="glass-panel p-3">
-              <div className="text-2xl font-bold text-primary-green">12,000+</div>
-              <div className="text-xs text-muted-foreground">Active Hunters</div>
-            </div>
-            <div className="glass-panel p-3">
-              <div className="text-2xl font-bold text-primary-green">99%</div>
-              <div className="text-xs text-muted-foreground">Success Rate</div>
-            </div>
-          </div>
-
           <div className="mt-8 flex items-center gap-4">
             <Button asChild className="cyber-button">
               <a href="/dashboard">Start Bug Hunting</a>
@@ -81,49 +64,25 @@ export default function MrCriminalHero() {
               <a href="/learn">Learn More</a>
             </Button>
           </div>
-          <div className="mt-6 text-xs uppercase tracking-widest text-primary-green/60">
-            Advanced Cybersecurity Platform
-          </div>
         </div>
 
-        {/* Visual Element */}
-        <div className="md:w-1/2">
-          <div className="relative h-[520px] w-full overflow-hidden rounded-2xl border border-primary-green/20 bg-gradient-to-br from-black/30 to-primary-green/5 shadow-2xl backdrop-blur">
-            {/* Animated cyber elements */}
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="relative">
-                {/* Central hub */}
-                <div className="h-32 w-32 rounded-full border-2 border-primary-green bg-primary-green/10 animate-pulse flex items-center justify-center">
-                  <div
-                    className="h-16 w-16 rounded-full border border-vibrant-green bg-vibrant-green/20 animate-spin"
-                    style={{ animationDuration: "3s" }}
-                  />
-                </div>
-
-                {/* Orbiting elements */}
-                <div className="absolute -inset-16">
-                  <div className="h-full w-full animate-spin" style={{ animationDuration: "10s" }}>
-                    <div className="absolute top-0 left-1/2 h-3 w-3 -translate-x-1/2 rounded-full bg-primary-green shadow-lg shadow-primary-green/50" />
-                    <div className="absolute bottom-0 left-1/2 h-3 w-3 -translate-x-1/2 rounded-full bg-vibrant-green shadow-lg shadow-vibrant-green/50" />
-                    <div className="absolute left-0 top-1/2 h-3 w-3 -translate-y-1/2 rounded-full bg-lime-green shadow-lg shadow-lime-green/50" />
-                    <div className="absolute right-0 top-1/2 h-3 w-3 -translate-y-1/2 rounded-full bg-primary-green shadow-lg shadow-primary-green/50" />
-                  </div>
-                </div>
-
-                {/* Floating text */}
-                <div className="absolute -top-20 left-1/2 -translate-x-1/2 text-center">
-                  <div className="text-2xl font-bold text-primary-green animate-pulse">BugHunter Pro</div>
-                  <div className="text-sm text-primary-green/60">AI-Powered Security</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Scan lines effect */}
-            <div className="absolute inset-0 opacity-20">
-              <div className="h-full w-full bg-gradient-to-b from-transparent via-primary-green/10 to-transparent animate-pulse" />
-            </div>
-          </div>
+        {/* Right Column: 3D Animation Canvas */}
+        <div className="h-full w-full min-h-[400px] md:min-h-0 cursor-grab active:cursor-grabbing">
+          <Canvas camera={{ position: [0, 0, 5], fov: 50 }}>
+            {/* Lighting for the scene to make the model visible and look good */}
+            <ambientLight intensity={1.5} />
+            <pointLight position={[10, 10, 10]} intensity={200} color="#00ff55" />
+            <pointLight position={[-10, -10, -10]} intensity={100} color="#ffffff" />
+            
+            <Suspense fallback={null}>
+              <ModelViewer />
+            </Suspense>
+            
+            {/* Controls allow users to rotate and zoom with their mouse */}
+            <OrbitControls enableZoom={true} enablePan={false} autoRotate autoRotateSpeed={0.8} />
+          </Canvas>
         </div>
+        
       </div>
     </section>
   )
