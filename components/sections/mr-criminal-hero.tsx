@@ -1,9 +1,21 @@
 "use client"
 
-import { Suspense, useRef } from "react"
-import { Canvas, useFrame } from "@react-three/fiber"
-import { OrbitControls, useGLTF, Environment, Bounds } from "@react-three/drei"
+import { Suspense } from "react"
+import { Canvas } from "@react-three/fiber"
+import { OrbitControls, useGLTF, Environment, Bounds, Html } from "@react-three/drei"
 import { Button } from "@/components/ui/button"
+
+// This is the new loading indicator component
+function ModelLoader() {
+  return (
+    <Html center>
+      <div className="flex flex-col items-center text-primary-green">
+        <div className="w-8 h-8 border-2 border-primary-green border-t-transparent rounded-full animate-spin"></div>
+        <p className="mt-2 font-mono text-sm">Loading Model...</p>
+      </div>
+    </Html>
+  )
+}
 
 // This component loads and displays your 3D model
 function ModelViewer() {
@@ -13,34 +25,6 @@ function ModelViewer() {
 
 // Preload the model for faster loading times
 useGLTF.preload("/models/hero-model.glb")
-
-
-// This component contains the logic for the cursor-following effect
-function Scene() {
-  const sceneRef = useRef<any>()
-
-  // This hook runs on every frame, allowing us to update the scene
-  useFrame(({ mouse, viewport }) => {
-    if (sceneRef.current) {
-      // Calculate the rotation based on mouse position
-      const x = (mouse.x * viewport.width) / 100
-      const y = (mouse.y * viewport.height) / 100
-      
-      // Apply a subtle rotation to the whole scene
-      sceneRef.current.rotation.y = x * 0.2 // Reduced intensity
-      sceneRef.current.rotation.x = -y * 0.2 // Reduced intensity
-    }
-  })
-
-  return (
-    <group ref={sceneRef}>
-      {/* Bounds will auto-center and scale your model */}
-      <Bounds fit clip observe margin={1.2}>
-        <ModelViewer />
-      </Bounds>
-    </group>
-  )
-}
 
 
 export default function MrCriminalHero() {
@@ -97,12 +81,20 @@ export default function MrCriminalHero() {
             <ambientLight intensity={0.5} />
             <Environment preset="city" />
             
-            <Suspense fallback={null}>
-              <Scene />
+            {/* Suspense shows the loader while the model is loading */}
+            <Suspense fallback={<ModelLoader />}>
+              <Bounds fit clip observe margin={1.2}>
+                <ModelViewer />
+              </Bounds>
             </Suspense>
             
-            {/* OrbitControls are disabled to allow for the cursor follow effect */}
-            <OrbitControls enableZoom={false} enablePan={false} enableRotate={false} />
+            {/* Controls now have autoRotate enabled */}
+            <OrbitControls 
+              enableZoom={true} 
+              enablePan={false} 
+              autoRotate 
+              autoRotateSpeed={0.8} 
+            />
           </Canvas>
         </div>
         
