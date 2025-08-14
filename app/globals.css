@@ -191,6 +191,24 @@
   .export-csv {
     @apply bg-green-600 hover:bg-green-700 text-white border-green-600;
   }
+
+  .progress-bar-container {
+    @apply w-full bg-secondary rounded-full h-4 overflow-hidden border border-primary-green/20;
+  }
+
+  .progress-bar-inner {
+    @apply bg-gradient-to-r from-primary-green to-vibrant-green h-full rounded-full transition-all duration-500 ease-linear;
+    animation: indeterminate-progress 2s infinite linear;
+  }
+
+  @keyframes indeterminate-progress {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(250%);
+    }
+  }
 }
 
 /* Particle animation */
