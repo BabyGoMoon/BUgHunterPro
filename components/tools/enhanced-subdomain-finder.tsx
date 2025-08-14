@@ -1,189 +1,140 @@
 "use client"
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Search, Download, Copy, ExternalLink } from "lucide-react"
+import { useState, useRef, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Search, Download, Copy, ExternalLink, Shield, Globe, Brain, Zap } from "lucide-react";
+import SubdomainScannerProgress from "./subdomain-scanner-progress"; // Import the new component
 
 interface SubdomainResult {
-  subdomain: string
-  ips: string[]
-  status: "active" | "inactive"
-  httpStatus?: number
-  title?: string
-  technologies?: string[]
-  sources: string[]
-  risk: "high" | "medium" | "low"
-  asn?: string
-  country?: string
+  subdomain: string;
+  riskLevel: "high" | "medium" | "low";
+  source: string;
+}
+
+interface ScanStats {
+  total: number;
+  fromWordlist: number;
+  fromCertificates: number;
 }
 
 export default function EnhancedSubdomainFinder() {
-  const [domain, setDomain] = useState("")
-  const [results, setResults] = useState<SubdomainResult[]>([])
-  const [isScanning, setIsScanning] = useState(false)
-  const [progress, setProgress] = useState(0)
-  const [stats, setStats] = useState({
-    total: 0,
-    active: 0,
-    inactive: 0,
-    highRisk: 0,
-  })
-  const [filter, setFilter] = useState<"all" | "active" | "inactive" | "high-risk">("all")
-  const [searchTerm, setSearchTerm] = useState("")
+  const [domain, setDomain] = useState("");
+  const [results, setResults] = useState<SubdomainResult[]>([]);
+  const [isScanning, setIsScanning] = useState(false);
+  const [statusMessage, setStatusMessage] = useState("");
+  const [stats, setStats] = useState<ScanStats>({ total: 0, fromWordlist: 0, fromCertificates: 0 });
+  const eventSourceRef = useRef<EventSource | null>(null);
+
+  useEffect(() => {
+    // Cleanup function to close the connection when the component unmounts
+    return () => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+      }
+    };
+  }, []);
 
   const startScan = async () => {
-    if (!domain) return
+    if (!domain || isScanning) return;
 
-    setIsScanning(true)
-    setProgress(0)
-    setResults([])
+    // Reset state for a new scan
+    setIsScanning(true);
+    setResults([]);
+    setStats({ total: 0, fromWordlist: 0, fromCertificates: 0 });
+    setStatusMessage("Initializing scan...");
 
-    try {
-      const response = await fetch("/api/ultimate-subdomain", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ domain }),
-      })
-
-      const { jobId } = await response.json()
-
-      // Simulate real-time results
-      const interval = setInterval(async () => {
-        const mockResults = generateMockSubdomains(domain)
-        const currentResults = mockResults.slice(0, Math.floor((progress / 100) * mockResults.length))
-
-        setResults(currentResults)
-        updateStats(currentResults)
-
-        if (progress >= 100) {
-          clearInterval(interval)
-          setIsScanning(false)
-        } else {
-          setProgress((prev) => Math.min(prev + 10, 100))
-        }
-      }, 1000)
-    } catch (error) {
-      console.error("Subdomain scan failed:", error)
-      setIsScanning(false)
+    // Close any existing connection
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
     }
-  }
 
-  const generateMockSubdomains = (domain: string): SubdomainResult[] => {
-    const subdomains = [
-      "www",
-      "api",
-      "admin",
-      "dev",
-      "test",
-      "staging",
-      "mail",
-      "ftp",
-      "cdn",
-      "blog",
-      "shop",
-      "app",
-      "mobile",
-      "secure",
-      "vpn",
-      "portal",
-      "dashboard",
-      "panel",
-      "beta",
-      "alpha",
-      "demo",
-      "sandbox",
-      "internal",
-      "private",
-      "backup",
-    ]
+    const url = `/api/subdomain-stream?domain=${encodeURIComponent(domain)}`;
+    const es = new EventSource(url);
+    eventSourceRef.current = es;
 
-    return subdomains.map((sub) => ({
-      subdomain: `${sub}.${domain}`,
-      ips: [`192.168.1.${Math.floor(Math.random() * 255)}`],
-      status: Math.random() > 0.3 ? "active" : ("inactive" as const),
-      httpStatus: Math.random() > 0.3 ? 200 : undefined,
-      title: `${sub.charAt(0).toUpperCase() + sub.slice(1)} - ${domain}`,
-      technologies: ["nginx", "cloudflare"].slice(0, Math.floor(Math.random() * 2) + 1),
-      sources: ["Certificate Transparency", "DNS Brute Force", "Search Engines"].slice(
-        0,
-        Math.floor(Math.random() * 3) + 1,
-      ),
-      risk: ["admin", "dev", "test", "internal", "private"].includes(sub)
-        ? "high"
-        : ["api", "secure", "vpn"].includes(sub)
-          ? "medium"
-          : ("low" as const),
-      asn: `AS${Math.floor(Math.random() * 99999)}`,
-      country: ["US", "UK", "DE", "FR", "JP"][Math.floor(Math.random() * 5)],
-    }))
-  }
+    es.onopen = () => {
+      console.log("SSE connection established.");
+    };
 
-  const updateStats = (results: SubdomainResult[]) => {
-    const stats = {
-      total: results.length,
-      active: results.filter((r) => r.status === "active").length,
-      inactive: results.filter((r) => r.status === "inactive").length,
-      highRisk: results.filter((r) => r.risk === "high").length,
-    }
-    setStats(stats)
-  }
+    es.addEventListener("status", (event) => {
+      const data = JSON.parse(event.data);
+      setStatusMessage(data.message);
+    });
 
-  const filteredResults = results.filter((result) => {
-    const matchesFilter =
-      filter === "all" ||
-      (filter === "active" && result.status === "active") ||
-      (filter === "inactive" && result.status === "inactive") ||
-      (filter === "high-risk" && result.risk === "high")
+    es.addEventListener("subdomain", (event) => {
+      const newSubdomain: SubdomainResult = JSON.parse(event.data);
+      setResults(prevResults => [...prevResults, newSubdomain]);
+      
+      setStats(prevStats => ({
+        total: prevStats.total + 1,
+        fromWordlist: prevStats.fromWordlist + (newSubdomain.source === 'wordlist' ? 1 : 0),
+        fromCertificates: prevStats.fromCertificates + (newSubdomain.source === 'certificate_transparency' ? 1 : 0),
+      }));
+    });
 
-    const matchesSearch = result.subdomain.toLowerCase().includes(searchTerm.toLowerCase())
+    es.addEventListener("complete", (event) => {
+      const data = JSON.parse(event.data);
+      setStatusMessage(data.message);
+      setIsScanning(false);
+      es.close();
+    });
 
-    return matchesFilter && matchesSearch
-  })
+    es.onerror = (error) => {
+      console.error("EventSource failed:", error);
+      setStatusMessage("An error occurred during the scan.");
+      setIsScanning(false);
+      es.close();
+    };
+  };
 
   const exportToCSV = () => {
     const csvContent = [
-      "Subdomain,IPs,Status,HTTP Status,Risk,Sources,ASN,Country",
-      ...results.map(
-        (r) =>
-          `${r.subdomain},"${r.ips.join(";")}",${r.status},${r.httpStatus || ""},${r.risk},"${r.sources.join(";")}",${r.asn},${r.country}`,
-      ),
-    ].join("\n")
+      "Subdomain,Risk Level,Source",
+      ...results.map(r => `${r.subdomain},${r.riskLevel},${r.source}`),
+    ].join("\n");
 
-    const blob = new Blob([csvContent], { type: "text/csv" })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement("a")
-    link.href = url
-    link.download = `subdomains-${domain}.csv`
-    link.click()
-  }
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `subdomains-${domain}.csv`;
+    link.click();
+  };
 
   const copyAllSubdomains = () => {
-    const subdomains = results.map((r) => r.subdomain).join("\n")
-    navigator.clipboard.writeText(subdomains)
-  }
-
+    const subdomains = results.map(r => r.subdomain).join("\n");
+    navigator.clipboard.writeText(subdomains);
+  };
+  
   const getRiskColor = (risk: string) => {
     switch (risk) {
-      case "high":
-        return "bg-red-500"
-      case "medium":
-        return "bg-yellow-500"
-      case "low":
-        return "bg-green-500"
-      default:
-        return "bg-gray-500"
+      case "high": return "bg-red-500/20 text-red-400";
+      case "medium": return "bg-yellow-500/20 text-yellow-400";
+      case "low": return "bg-green-500/20 text-green-400";
+      default: return "bg-gray-500/20 text-gray-400";
     }
-  }
+  };
 
+  const getSourceIcon = (source: string) => {
+    switch (source) {
+      case "wordlist": return <Search className="h-3 w-3 text-primary-green" />;
+      case "certificate_transparency": return <Shield className="h-3 w-3 text-blue-400" />;
+      default: return <Globe className="h-3 w-3" />;
+    }
+  };
+
+  // --- Conditional Rendering Logic ---
+  if (isScanning) {
+    return <SubdomainScannerProgress domain={domain} statusMessage={statusMessage} />;
+  }
+  
   return (
     <div className="space-y-6">
-      {/* Input Section */}
-      <Card className="border-primary-green/20">
+      <Card className="glass-panel">
         <CardHeader>
           <CardTitle className="text-primary-green header-title">Ultimate Subdomain Enumeration</CardTitle>
           <p className="text-muted-foreground">
@@ -202,140 +153,85 @@ export default function EnhancedSubdomainFinder() {
             <Button
               onClick={startScan}
               disabled={!domain || isScanning}
-              className="bg-primary-green hover:bg-vibrant-green text-black"
+              className="cyber-button"
             >
               <Search className="h-4 w-4 mr-2" />
-              {isScanning ? "Scanning..." : "Start Scan"}
+              Start Scan
             </Button>
           </div>
-
-          {isScanning && (
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>Discovering subdomains...</span>
-                <span>{progress}%</span>
-              </div>
-              <Progress value={progress} className="h-2" />
-            </div>
-          )}
         </CardContent>
       </Card>
 
-      {/* Stats */}
       {results.length > 0 && (
-        <Card className="border-primary-green/20">
-          <CardContent className="p-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-primary-green">{stats.total}</div>
-                <div className="text-sm text-muted-foreground">Total Found</div>
+        <>
+          <Card className="glass-panel">
+            <CardContent className="p-6">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                <div>
+                  <div className="text-2xl font-bold text-primary-green">{stats.total}</div>
+                  <p className="text-sm text-muted-foreground">Live Subdomains</p>
+                </div>
+                 <div>
+                  <div className="text-2xl font-bold text-vibrant-green">{stats.fromWordlist}</div>
+                  <p className="text-sm text-muted-foreground">From Wordlist</p>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-blue-400">{stats.fromCertificates}</div>
+                  <p className="text-sm text-muted-foreground">From Certificates</p>
+                </div>
+                 <div>
+                  <div className="text-2xl font-bold text-red-500">{results.filter(r => r.riskLevel === 'high').length}</div>
+                  <p className="text-sm text-muted-foreground">High Risk</p>
+                </div>
               </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-500">{stats.active}</div>
-                <div className="text-sm text-muted-foreground">Active</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-gray-500">{stats.inactive}</div>
-                <div className="text-sm text-muted-foreground">Inactive</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-red-500">{stats.highRisk}</div>
-                <div className="text-sm text-muted-foreground">High Risk</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+            </CardContent>
+          </Card>
 
-      {/* Controls */}
-      {results.length > 0 && (
-        <Card className="border-primary-green/20">
-          <CardContent className="p-4">
-            <div className="flex flex-wrap gap-4 items-center">
-              <div className="flex gap-2">
-                <Button size="sm" variant={filter === "all" ? "default" : "outline"} onClick={() => setFilter("all")}>
-                  All ({stats.total})
-                </Button>
-                <Button
-                  size="sm"
-                  variant={filter === "active" ? "default" : "outline"}
-                  onClick={() => setFilter("active")}
-                >
-                  Active ({stats.active})
-                </Button>
-                <Button
-                  size="sm"
-                  variant={filter === "high-risk" ? "default" : "outline"}
-                  onClick={() => setFilter("high-risk")}
-                >
-                  High Risk ({stats.highRisk})
-                </Button>
+          <Card className="glass-panel">
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <CardTitle className="text-primary-green">Discovered Subdomains</CardTitle>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={copyAllSubdomains}>
+                    <Copy className="h-4 w-4 mr-2" /> Copy All
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={exportToCSV} className="export-csv">
+                    <Download className="h-4 w-4 mr-2" /> Export CSV
+                  </Button>
+                </div>
               </div>
-
-              <Input
-                placeholder="Search subdomains..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="max-w-xs"
-              />
-
-              <div className="flex gap-2 ml-auto">
-                <Button size="sm" variant="outline" onClick={copyAllSubdomains}>
-                  <Copy className="h-4 w-4 mr-2" />
-                  Copy All
-                </Button>
-                <Button size="sm" variant="outline" onClick={exportToCSV} className="export-csv bg-transparent">
-                  <Download className="h-4 w-4 mr-2" />
-                  Export CSV
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Results */}
-      {filteredResults.length > 0 && (
-        <Card className="border-primary-green/20">
-          <CardHeader>
-            <CardTitle className="text-primary-green">Discovered Subdomains ({filteredResults.length})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="results-container">
-              <div className="subdomain-list">
-                {filteredResults.map((result, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-background/50"
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <a
-                          href={`https://${result.subdomain}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="font-mono text-sm hover:text-primary-green transition-colors"
-                        >
-                          {result.subdomain}
-                        </a>
-                        <ExternalLink className="h-3 w-3 text-muted-foreground" />
-                      </div>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge variant={result.status === "active" ? "default" : "secondary"}>{result.status}</Badge>
-                        <Badge className={getRiskColor(result.risk)}>{result.risk} risk</Badge>
-                        {result.httpStatus && <Badge variant="outline">HTTP {result.httpStatus}</Badge>}
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        Sources: {result.sources.join(", ")} | IPs: {result.ips.join(", ")}
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="results-container">
+                <div className="subdomain-list">
+                  {results.map((result, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-3 border rounded-lg hover:bg-background/50 transition-colors"
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                           <a href={`https://${result.subdomain}`} target="_blank" rel="noopener noreferrer" className="font-mono text-sm hover:text-primary-green transition-colors">
+                            {result.subdomain}
+                          </a>
+                          <ExternalLink className="h-3 w-3 text-muted-foreground" />
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge className={getRiskColor(result.riskLevel)}>{result.riskLevel} risk</Badge>
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            {getSourceIcon(result.source)}
+                            <span>{result.source.replace(/_/g, ' ')}</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
+                  ))}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </>
       )}
     </div>
-  )
+  );
 }
