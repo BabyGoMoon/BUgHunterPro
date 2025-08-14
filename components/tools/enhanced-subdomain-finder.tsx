@@ -6,8 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, Download, Copy, ExternalLink, Shield, Globe, Brain, Zap } from "lucide-react";
-import SubdomainScannerProgress from "./subdomain-scanner-progress"; // Import the new component
+import { Search, Download, Copy, ExternalLink, Shield, Globe } from "lucide-react";
+import SubdomainScannerProgress from "./subdomain-scanner-progress";
 
 interface SubdomainResult {
   subdomain: string;
@@ -30,7 +30,7 @@ export default function EnhancedSubdomainFinder() {
   const eventSourceRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
-    // Cleanup function to close the connection when the component unmounts
+    // This is a cleanup function. It runs when you navigate away from the page.
     return () => {
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
@@ -38,7 +38,7 @@ export default function EnhancedSubdomainFinder() {
     };
   }, []);
 
-  const startScan = async () => {
+  const startScan = () => {
     if (!domain || isScanning) return;
 
     // Reset state for a new scan
@@ -47,7 +47,7 @@ export default function EnhancedSubdomainFinder() {
     setStats({ total: 0, fromWordlist: 0, fromCertificates: 0 });
     setStatusMessage("Initializing scan...");
 
-    // Close any existing connection
+    // Close any existing connection from a previous scan
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
     }
@@ -103,6 +103,7 @@ export default function EnhancedSubdomainFinder() {
     link.href = url;
     link.download = `subdomains-${domain}.csv`;
     link.click();
+    URL.revokeObjectURL(url);
   };
 
   const copyAllSubdomains = () => {
@@ -127,7 +128,7 @@ export default function EnhancedSubdomainFinder() {
     }
   };
 
-  // --- Conditional Rendering Logic ---
+  // --- Main Render Logic ---
   if (isScanning) {
     return <SubdomainScannerProgress domain={domain} statusMessage={statusMessage} />;
   }
@@ -162,7 +163,7 @@ export default function EnhancedSubdomainFinder() {
         </CardContent>
       </Card>
 
-      {results.length > 0 && (
+      {!isScanning && results.length > 0 && (
         <>
           <Card className="glass-panel">
             <CardContent className="p-6">
@@ -202,7 +203,7 @@ export default function EnhancedSubdomainFinder() {
               </div>
             </CardHeader>
             <CardContent>
-              <ScrollArea className="results-container">
+              <ScrollArea className="results-container h-96">
                 <div className="subdomain-list">
                   {results.map((result, index) => (
                     <div
