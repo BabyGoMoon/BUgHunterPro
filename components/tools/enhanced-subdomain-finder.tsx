@@ -22,42 +22,31 @@ interface ScanStats {
 }
 
 export default function EnhancedSubdomainFinder() {
-  const [domain, setDomain] = useState("");
+  const [domainInput, setDomainInput] = useState("");
+  const [scanTarget, setScanTarget] = useState<string | null>(null);
   const [results, setResults] = useState<SubdomainResult[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
   const [stats, setStats] = useState<ScanStats>({ total: 0, fromWordlist: 0, fromCertificates: 0 });
   const eventSourceRef = useRef<EventSource | null>(null);
 
+  // This effect hook handles the connection to the streaming API
   useEffect(() => {
-    // This is a cleanup function. It runs when you navigate away from the page.
-    return () => {
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-      }
-    };
-  }, []);
+    if (!scanTarget) {
+      return;
+    }
 
-  const startScan = () => {
-    if (!domain || isScanning) return;
-
-    // Reset state for a new scan
-    setIsScanning(true);
-    setResults([]);
-    setStats({ total: 0, fromWordlist: 0, fromCertificates: 0 });
-    setStatusMessage("Initializing scan...");
-
-    // Close any existing connection from a previous scan
+    // Ensure any previous connection is closed before starting a new one
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
     }
 
-    const url = `/api/subdomain-stream?domain=${encodeURIComponent(domain)}`;
+    const url = `/api/subdomain-stream?domain=${encodeURIComponent(scanTarget)}`;
     const es = new EventSource(url);
     eventSourceRef.current = es;
 
     es.onopen = () => {
-      console.log("SSE connection established.");
+      console.log("SSE connection established for", scanTarget);
     };
 
     es.addEventListener("status", (event) => {
@@ -80,6 +69,7 @@ export default function EnhancedSubdomainFinder() {
       const data = JSON.parse(event.data);
       setStatusMessage(data.message);
       setIsScanning(false);
+      setScanTarget(null); // Reset scan target
       es.close();
     });
 
@@ -87,8 +77,25 @@ export default function EnhancedSubdomainFinder() {
       console.error("EventSource failed:", error);
       setStatusMessage("An error occurred during the scan.");
       setIsScanning(false);
+      setScanTarget(null); // Reset scan target
       es.close();
     };
+
+    // Cleanup function: This will be called when the component unmounts or scanTarget changes
+    return () => {
+      if (es) {
+        es.close();
+      }
+    };
+  }, [scanTarget]); // This effect re-runs only when `scanTarget` changes
+
+  const handleStartScan = () => {
+    if (!domainInput || isScanning) return;
+    setIsScanning(true);
+    setResults([]);
+    setStats({ total: 0, fromWordlist: 0, fromCertificates: 0 });
+    setStatusMessage("Initializing scan...");
+    setScanTarget(domainInput); // This will trigger the useEffect to start the scan
   };
 
   const exportToCSV = () => {
@@ -101,7 +108,7 @@ export default function EnhancedSubdomainFinder() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `subdomains-${domain}.csv`;
+    link.download = `subdomains-${scanTarget}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -128,9 +135,8 @@ export default function EnhancedSubdomainFinder() {
     }
   };
 
-  // --- Main Render Logic ---
   if (isScanning) {
-    return <SubdomainScannerProgress domain={domain} statusMessage={statusMessage} />;
+    return <SubdomainScannerProgress domain={scanTarget || ""} statusMessage={statusMessage} />;
   }
   
   return (
@@ -146,16 +152,11 @@ export default function EnhancedSubdomainFinder() {
           <div className="flex gap-4">
             <Input
               placeholder="example.com"
-              value={domain}
-              onChange={(e) => setDomain(e.target.value)}
+              value={domainInput}
+              onChange={(e) => setDomainInput(e.target.value)}
               className="flex-1"
-              disabled={isScanning}
             />
-            <Button
-              onClick={startScan}
-              disabled={!domain || isScanning}
-              className="cyber-button"
-            >
+            <Button onClick={handleStartScan} disabled={!domainInput} className="cyber-button">
               <Search className="h-4 w-4 mr-2" />
               Start Scan
             </Button>
@@ -207,7 +208,7 @@ export default function EnhancedSubdomainFinder() {
                 <div className="subdomain-list">
                   {results.map((result, index) => (
                     <div
-                      key={index}
+                      key={`${result.subdomain}-${index}`}
                       className="flex items-center justify-between p-3 border rounded-lg hover:bg-background/50 transition-colors"
                     >
                       <div className="flex-1">
