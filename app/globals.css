@@ -1,0 +1,210 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --background: oklch(0.05 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.08 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.08 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.5 0.2 150);
+  --primary-foreground: oklch(0.05 0 0);
+  --secondary: oklch(0.15 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.15 0 0);
+  --muted-foreground: oklch(0.7 0 0);
+  --accent: oklch(0.15 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.2 0 0);
+  --input: oklch(0.15 0 0);
+  --ring: oklch(0.5 0.2 150);
+  --chart-1: oklch(0.5 0.2 150);
+  --chart-2: oklch(0.6 0.2 120);
+  --chart-3: oklch(0.7 0.2 90);
+  --chart-4: oklch(0.4 0.2 180);
+  --chart-5: oklch(0.8 0.2 60);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.08 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.5 0.2 150);
+  --sidebar-primary-foreground: oklch(0.05 0 0);
+  --sidebar-accent: oklch(0.15 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(0.2 0 0);
+  --sidebar-ring: oklch(0.5 0.2 150);
+
+  /* Added custom cyberpunk green color palette */
+  --primary-green: oklch(0.6 0.25 150);
+  --vibrant-green: oklch(0.7 0.3 150);
+  --lime-green: oklch(0.8 0.2 120);
+  --dark-green: oklch(0.3 0.2 150);
+  --critical: oklch(0.6 0.25 0);
+  --high: oklch(0.65 0.2 30);
+  --medium: oklch(0.7 0.15 60);
+  --low: oklch(0.75 0.1 120);
+  --cyber-grid: radial-gradient(circle at 1px 1px, rgba(0, 255, 0, 0.15) 1px, transparent 0);
+  --grid: 20px 20px;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Added custom color definitions for Tailwind CSS v4 */
+  --color-primary-green: var(--primary-green);
+  --color-vibrant-green: var(--vibrant-green);
+  --color-lime-green: var(--lime-green);
+  --color-dark-green: var(--dark-green);
+  --color-critical: var(--critical);
+  --color-high: var(--high);
+  --color-medium: var(--medium);
+  --color-low: var(--low);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    background-image: var(--cyber-grid);
+    background-size: var(--grid);
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-secondary;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-primary-green rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-vibrant-green;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply bg-card/80 backdrop-blur-md border border-primary-green/20 rounded-lg;
+  }
+
+  .neon-border {
+    @apply border border-primary-green shadow-[0_0_10px_rgba(0,255,0,0.3)];
+  }
+
+  .cyber-button {
+    @apply bg-primary-green hover:bg-vibrant-green text-black font-semibold px-6 py-3 rounded-lg;
+    @apply transition-all duration-300;
+    @apply hover:shadow-[0_0_20px_rgba(0,255,0,0.5)];
+    @apply hover:scale-105;
+  }
+
+  .terminal-text {
+    @apply font-mono text-sm text-lime-green;
+  }
+
+  .severity-critical {
+    @apply text-critical border-critical/50 bg-critical/10;
+  }
+
+  .severity-high {
+    @apply text-high border-high/50 bg-high/10;
+  }
+
+  .severity-medium {
+    @apply text-medium border-medium/50 bg-medium/10;
+  }
+
+  .severity-low {
+    @apply text-low border-low/50 bg-low/10;
+  }
+}
+
+/* Particle animation */
+@keyframes particle-float {
+  0%,
+  100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  33% {
+    transform: translateY(-10px) rotate(120deg);
+  }
+  66% {
+    transform: translateY(5px) rotate(240deg);
+  }
+}
+
+.particle {
+  animation: particle-float 4s ease-in-out infinite;
+}
+
+/* Glitch effect */
+@keyframes glitch {
+  0% {
+    transform: translate(0);
+  }
+  20% {
+    transform: translate(-2px, 2px);
+  }
+  40% {
+    transform: translate(-2px, -2px);
+  }
+  60% {
+    transform: translate(2px, 2px);
+  }
+  80% {
+    transform: translate(2px, -2px);
+  }
+  100% {
+    transform: translate(0);
+  }
+}
+
+.glitch {
+  animation: glitch 0.3s ease-in-out infinite;
+}
