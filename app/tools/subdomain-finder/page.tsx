@@ -1,8 +1,7 @@
-// app/tools/subdomain-finder/page.tsx
 import React from "react";
 import dynamic from "next/dynamic";
 
-const SubdomainFinderClient = dynamic(() => import("../../../components/SubdomainFinderClient"), {
+const SubdomainFinderClient = dynamic(() => import("../../../components/tools/enhanced-subdomain-finder"), {
   ssr: false,
 });
 
