@@ -1,15 +1,18 @@
-import { Header } from "@/components/layout/header"
-import VerifiedSubdomainFinder from "@/components/tools/verified-subdomain-finder"
+// app/tools/subdomain-finder/page.tsx
+import React from "react";
+import dynamic from "next/dynamic";
 
-export default function SubdomainFinderPage() {
+const SubdomainFinderClient = dynamic(() => import("../../../components/SubdomainFinderClient"), {
+  ssr: false,
+});
+
+export default function Page() {
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      <main className="pt-16 p-6">
-        <div className="max-w-7xl mx-auto">
-          <<VerifiedSubdomainFinder /> />
-        </div>
-      </main>
+    <div className="container mx-auto p-6">
+      <h1 className="text-2xl font-bold mb-4">Subdomain Finder</h1>
+      <div className="bg-white shadow rounded p-4">
+        <SubdomainFinderClient />
+      </div>
     </div>
-  )
+  );
 }
