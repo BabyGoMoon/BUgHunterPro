@@ -1,24 +1,58 @@
 import dns from "dns/promises";
+import fs from "fs";
+import path from "path";
+import crypto from "crypto";
 
-// Helper function to verify if a subdomain exists via DNS lookup
-async function verifySubdomain(subdomain: string): Promise<boolean> {
-  try {
-    // We can check for A (IPv4), AAAA (IPv6), or CNAME records.
-    // resolve() looks for A or AAAA records.
-    const addresses = await dns.resolve(subdomain);
-    // If we get any address back, the subdomain is live.
-    return addresses && addresses.length > 0;
-  } catch (error: any) {
-    // Common errors for non-existent domains are ENOTFOUND, ENODATA
-    if (error.code === 'ENOTFOUND' || error.code === 'ENODATA') {
-      return false;
+// --- Concurrency Helper ---
+// This function allows us to run multiple DNS checks at the same time.
+async function pMap<T, R>(
+  arr: T[],
+  mapper: (item: T) => Promise<R>,
+  concurrency = 25 // Set to check 25 subdomains in parallel
+): Promise<R[]> {
+  const results: R[] = [];
+  let i = 0;
+  const workers = new Array(Math.max(1, concurrency)).fill(0).map(async () => {
+    while (i < arr.length) {
+      const idx = i++;
+      try {
+        results[idx] = await mapper(arr[idx]);
+      } catch (e) {
+        results[idx] = undefined as any; // Store undefined on error to maintain order
+      }
     }
-    // For other potential errors, we can log them but assume not found
-    console.error(`DNS check failed for ${subdomain}:`, error.code);
+  });
+  await Promise.all(workers);
+  return results.filter(r => r !== undefined); // Filter out any errors
+}
+
+// --- DNS Verification ---
+// This function checks if a subdomain actually exists.
+async function verifySubdomain(subdomain: string): Promise<string | null> {
+  try {
+    const addresses = await dns.resolve(subdomain);
+    return addresses && addresses.length > 0 ? subdomain : null;
+  } catch (error: any) {
+    if (error.code === 'ENOTFOUND' || error.code === 'ENODATA') {
+      return null;
+    }
+    return null;
+  }
+}
+
+// --- Wildcard Detection ---
+// This function checks if the server responds to any random subdomain.
+async function detectWildcard(domain: string): Promise<boolean> {
+  const randomSubdomain = `${crypto.randomBytes(6).toString("hex")}.${domain}`;
+  try {
+    await dns.resolve(randomSubdomain);
+    return true; // If a random subdomain resolves, a wildcard is likely configured
+  } catch {
     return false;
   }
 }
 
+// --- Main API Route ---
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const domain = searchParams.get("domain");
@@ -28,7 +62,6 @@ export async function GET(request: Request) {
   }
 
   const encoder = new TextEncoder();
-
   const stream = new ReadableStream({
     async start(controller) {
       const sendEvent = (event: string, data: any) => {
@@ -37,117 +70,66 @@ export async function GET(request: Request) {
       };
 
       try {
-        sendEvent("status", { message: "Initializing verified scan..." });
-        
-        const wordlist = [
-            "www", "mail", "ftp", "localhost", "webmail", "smtp", "webdisk", "pop", "cpanel", "whm", "ns1", "ns2",
-            "autodiscover", "autoconfig", "ns", "test", "m", "blog", "dev", "www2", "ns3", "pop3", "forum", "admin",
-            "mail2", "vpn", "mx", "imap", "old", "new", "mobile", "mysql", "beta", "support", "cp", "secure", "shop",
-            "demo", "dns2", "ns4", "dns1", "static", "lists", "web", "www1", "img", "news", "portal", "server", "wiki",
-            "api", "media", "images", "backup", "dns", "sql", "intranet", "stats",
-            "host", "video", "mail1", "mx1", "www3", "staging", "sip", "chat", "search", "crm", "mx2", "ads",
-            "remote", "email", "my", "wap", "svn", "store", "cms", "download", "proxy", "mssql",
-            "apps", "dns3", "exchange", "mail3", "forums", "ns5", "db", "office", "live", "files", "info", "owa",
-            "monitor", "helpdesk", "panel", "sms", "newsletter", "ftp2", "web1", "web2", "upload", "home", "bbs",
-            "login", "app", "en", "blogs", "it", "cdn", "stage", "gw", "dns4"
-            // This is a truncated list for brevity. Your full list will be used.
-        ];
-
-        let totalFound = 0;
-        let checkedCount = 0;
-
-        // --- Verification from Wordlist ---
-        sendEvent("status", { message: `Checking ${wordlist.length} potential subdomains...` });
-
-        for (const sub of wordlist) {
-          const subdomain = `${sub}.${domain}`;
-          const isLive = await verifySubdomain(subdomain);
-          checkedCount++;
-          
-          if (isLive) {
-            totalFound++;
-            const riskLevel = ["admin", "dev", "staging", "test", "secure", "vpn", "sql", "mysql", "db", "database", "backup", "root", "cpanel", "whm", "phpmyadmin", "internal", "private"].includes(sub)
-              ? "high"
-              : ["api", "portal", "dashboard", "beta", "demo", "sso", "auth", "login", "signin"].includes(sub)
-                ? "medium"
-                : "low";
-
-            sendEvent("subdomain", {
-              subdomain,
-              riskLevel,
-              source: "wordlist (verified)",
-            });
-          }
-          // Optional: Send progress updates to the frontend
-          if (checkedCount % 20 === 0) {
-              sendEvent("status", { message: `Checked ${checkedCount}/${wordlist.length}... Found ${totalFound} live.` });
-          }
+        // 1. Wildcard Detection
+        sendEvent("status", { message: "Detecting wildcard DNS..." });
+        const hasWildcard = await detectWildcard(domain);
+        if (hasWildcard) {
+          sendEvent("status", { message: "Warning: Wildcard DNS detected. This may affect results." });
+        } else {
+          sendEvent("status", { message: "No wildcard DNS detected. Starting scan." });
         }
 
-        // --- Verification from Certificate Transparency ---
-        sendEvent("status", { message: "Querying and verifying certificate transparency logs..." });
+        // 2. Read Wordlist from your uploaded file
+        const wordlistPath = path.join(process.cwd(), "wordlists", "subdomains-top1million-5000.txt");
+        let wordlist: string[] = [];
+        if (fs.existsSync(wordlistPath)) {
+          wordlist = fs.readFileSync(wordlistPath, "utf8").split(/\r?\n/).filter(Boolean);
+        }
+        
+        if (wordlist.length === 0) {
+            sendEvent("error", { message: "Wordlist not found or is empty. Please check the 'wordlists' folder in your project root." });
+            controller.close();
+            return;
+        }
+        sendEvent("status", { message: `Loaded ${wordlist.length} subdomains. Verifying concurrently...` });
 
-        try {
-          const ctUrl = `https://crt.sh/?q=%25.${domain}&output=json`;
-          const response = await fetch(ctUrl, {
-            headers: { "User-Agent": "BugHunter-Pro/1.0" },
-            signal: AbortSignal.timeout(10000),
-          });
+        const candidates = wordlist.map(sub => `${sub}.${domain}`);
+        let totalFound = 0;
 
-          if (response.ok) {
-            const data = await response.json();
-            const ctSubdomains = new Set<string>();
+        // 3. Concurrent DNS Lookups
+        await pMap(candidates, async (subdomain) => {
+            const isLive = await verifySubdomain(subdomain);
+            if(isLive) {
+                totalFound++;
+                const subPart = subdomain.replace(`.${domain}`, '');
+                const riskLevel = ["admin", "dev", "staging", "test", "secure", "vpn", "sql", "db", "backup", "root", "cpanel", "internal", "private"].includes(subPart)
+                  ? "high"
+                  : ["api", "portal", "dashboard", "sso", "auth", "login"].includes(subPart)
+                    ? "medium"
+                    : "low";
 
-            if (Array.isArray(data)) {
-              data.forEach((entry: any) => {
-                if (entry.name_value) {
-                  entry.name_value.split("\n").forEach((name: string) => {
-                    const cleanName = name.trim().toLowerCase().replace('*.', '');
-                    if (cleanName.endsWith(`.${domain}`) && !wordlist.includes(cleanName.replace(`.${domain}`, ''))) {
-                      ctSubdomains.add(cleanName);
-                    }
-                  });
-                }
-              });
-
-              for (const subdomain of ctSubdomains) {
-                const isLive = await verifySubdomain(subdomain);
-                if (isLive) {
-                  totalFound++;
-                  const riskLevel = subdomain.includes("admin") || subdomain.includes("dev") || subdomain.includes("staging") ? "high" : "medium";
-                  sendEvent("subdomain", {
+                sendEvent("subdomain", {
                     subdomain,
                     riskLevel,
-                    source: "certificate (verified)",
-                  });
-                }
-              }
+                    source: "Wordlist (Verified)",
+                });
             }
-          }
-        } catch (ctError) {
-          console.error("Certificate transparency error:", ctError);
-          sendEvent("status", { message: "Certificate transparency query failed, continuing..." });
-        }
+        }, 25); // Concurrency of 25
+
+        sendEvent("status", { message: `Wordlist scan complete. Found ${totalFound} live subdomains.` });
 
         sendEvent("complete", {
           total: totalFound,
           message: `Scan complete! Found ${totalFound} verified subdomains.`,
         });
+
       } catch (error) {
-        sendEvent("error", {
-          message: error instanceof Error ? error.message : "An unknown error occurred",
-        });
+        sendEvent("error", { message: "An unexpected error occurred during the scan." });
       } finally {
         controller.close();
       }
     },
   });
 
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-    },
-  });
+  return new Response(stream, { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive" } });
 }
