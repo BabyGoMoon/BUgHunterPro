@@ -7,7 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Search, Download, Copy, ExternalLink, Shield, Globe, Zap, CheckCircle } from "lucide-react";
-import dns from "dns/promises";
 
 // --- START: Progress Component (now inside this file) ---
 interface SubdomainScannerProgressProps {
