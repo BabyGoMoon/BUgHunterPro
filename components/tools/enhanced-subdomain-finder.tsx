@@ -6,48 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, Download, Copy, ExternalLink, Shield, Globe, Zap } from "lucide-react";
-
-// --- START: Progress Component (now inside this file) ---
-interface SubdomainScannerProgressProps {
-  domain: string;
-  statusMessage: string;
-}
-
-function SubdomainScannerProgress({ domain, statusMessage }: SubdomainScannerProgressProps) {
-  return (
-    <Card className="glass-panel border-primary-green/30 animate-in fade-in duration-500">
-      <CardHeader>
-        <CardTitle className="text-primary-green flex items-center gap-2">
-          <div className="w-2 h-2 bg-vibrant-green rounded-full animate-pulse" />
-          Scanning in Progress...
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="text-lg">
-          Target: <span className="font-mono text-vibrant-green">{domain}</span>
-        </div>
-        
-        <div className="space-y-2">
-          <div className="flex justify-between items-center text-sm">
-            <span className="text-muted-foreground">{statusMessage}</span>
-            <span className="text-primary-green font-semibold">100%</span>
-          </div>
-          <div className="progress-bar-container">
-            <div className="progress-bar-inner" style={{ width: '40%' }}></div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 text-sm text-muted-foreground pt-2">
-          <Zap className="h-4 w-4 text-yellow-400" />
-          <p>This may take a few moments. AI-powered analysis and certificate transparency logs are being queried.</p>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-// --- END: Progress Component ---
-
+import { Search, Download, Copy, ExternalLink, Shield, CheckCircle, Globe } from "lucide-react";
+import SubdomainScannerProgress from "./subdomain-scanner-progress.tsx";
 
 interface SubdomainResult {
   subdomain: string;
@@ -71,9 +31,24 @@ export default function EnhancedSubdomainFinder() {
   const eventSourceRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
-    if (!scanTarget) {
-      return;
-    }
+    return () => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+      }
+    };
+  }, []);
+
+  const startScan = () => {
+    if (!domainInput || isScanning) return;
+    setIsScanning(true);
+    setResults([]);
+    setStats({ total: 0, fromWordlist: 0, fromCertificates: 0 });
+    setStatusMessage("Initializing verified scan...");
+    setScanTarget(domainInput);
+  };
+  
+  useEffect(() => {
+    if (!scanTarget) return;
 
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
@@ -96,8 +71,8 @@ export default function EnhancedSubdomainFinder() {
       
       setStats(prevStats => ({
         total: prevStats.total + 1,
-        fromWordlist: prevStats.fromWordlist + (newSubdomain.source === 'wordlist' ? 1 : 0),
-        fromCertificates: prevStats.fromCertificates + (newSubdomain.source === 'certificate_transparency' ? 1 : 0),
+        fromWordlist: prevStats.fromWordlist + (newSubdomain.source.includes('wordlist') ? 1 : 0),
+        fromCertificates: prevStats.fromCertificates + (newSubdomain.source.includes('certificate') ? 1 : 0),
       }));
     });
 
@@ -124,15 +99,6 @@ export default function EnhancedSubdomainFinder() {
     };
   }, [scanTarget]);
 
-  const handleStartScan = () => {
-    if (!domainInput || isScanning) return;
-    setIsScanning(true);
-    setResults([]);
-    setStats({ total: 0, fromWordlist: 0, fromCertificates: 0 });
-    setStatusMessage("Initializing scan...");
-    setScanTarget(domainInput);
-  };
-
   const exportToCSV = () => {
     const csvContent = [
       "Subdomain,Risk Level,Source",
@@ -142,7 +108,7 @@ export default function EnhancedSubdomainFinder() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `subdomains-${scanTarget}.csv`;
+    link.download = `verified-subdomains-${scanTarget}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -162,11 +128,9 @@ export default function EnhancedSubdomainFinder() {
   };
 
   const getSourceIcon = (source: string) => {
-    switch (source) {
-      case "wordlist": return <Search className="h-3 w-3 text-primary-green" />;
-      case "certificate_transparency": return <Shield className="h-3 w-3 text-blue-400" />;
-      default: return <Globe className="h-3 w-3" />;
-    }
+    if (source.includes('wordlist')) return <Search className="h-3 w-3 text-primary-green" />;
+    if (source.includes('certificate')) return <Shield className="h-3 w-3 text-blue-400" />;
+    return <Globe className="h-3 w-3" />;
   };
 
   if (isScanning) {
@@ -177,9 +141,9 @@ export default function EnhancedSubdomainFinder() {
     <div className="space-y-6">
       <Card className="glass-panel">
         <CardHeader>
-          <CardTitle className="text-primary-green header-title">Ultimate Subdomain Enumeration</CardTitle>
+          <CardTitle className="text-primary-green header-title">Verified Subdomain Finder</CardTitle>
           <p className="text-muted-foreground">
-            Multi-source subdomain discovery with verification and risk assessment
+            Multi-source subdomain discovery with live DNS verification.
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -190,9 +154,9 @@ export default function EnhancedSubdomainFinder() {
               onChange={(e) => setDomainInput(e.target.value)}
               className="flex-1"
             />
-            <Button onClick={handleStartScan} disabled={!domainInput} className="cyber-button">
-              <Search className="h-4 w-4 mr-2" />
-              Start Scan
+            <Button onClick={startScan} disabled={!domainInput} className="cyber-button">
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Start Verified Scan
             </Button>
           </div>
         </CardContent>
@@ -205,7 +169,7 @@ export default function EnhancedSubdomainFinder() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
                 <div>
                   <div className="text-2xl font-bold text-primary-green">{stats.total}</div>
-                  <p className="text-sm text-muted-foreground">Live Subdomains</p>
+                  <p className="text-sm text-muted-foreground">Verified Subdomains</p>
                 </div>
                  <div>
                   <div className="text-2xl font-bold text-vibrant-green">{stats.fromWordlist}</div>
