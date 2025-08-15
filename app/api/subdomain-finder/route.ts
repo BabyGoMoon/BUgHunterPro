@@ -67,6 +67,10 @@ async function mapLimit<T, R>(items: T[], limit: number, worker: (item: T, idx: 
 }
 
 // ---- API handler ----
+export async function GET() {
+  return NextResponse.json({ message: "Subdomain Finder API is working" });
+}
+
 export async function POST(req: Request) {
   try {
     if (!API_KEY) {
