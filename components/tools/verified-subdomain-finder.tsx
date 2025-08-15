@@ -57,15 +57,17 @@ interface SubdomainResult {
 
 interface ScanStats {
   total: number;
+  fromWordlist: number;
+  fromCertificates: number;
 }
 
-export default function VerifiedSubdomainFinder() {
+export default function EnhancedSubdomainFinder() {
   const [domainInput, setDomainInput] = useState("");
   const [scanTarget, setScanTarget] = useState<string | null>(null);
   const [results, setResults] = useState<SubdomainResult[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
-  const [stats, setStats] = useState<ScanStats>({ total: 0 });
+  const [stats, setStats] = useState<ScanStats>({ total: 0, fromWordlist: 0, fromCertificates: 0 });
   const eventSourceRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
@@ -80,7 +82,7 @@ export default function VerifiedSubdomainFinder() {
     if (!domainInput || isScanning) return;
     setIsScanning(true);
     setResults([]);
-    setStats({ total: 0 });
+    setStats({ total: 0, fromWordlist: 0, fromCertificates: 0 });
     setStatusMessage("Initializing verified scan...");
     setScanTarget(domainInput);
   };
@@ -106,7 +108,12 @@ export default function VerifiedSubdomainFinder() {
     es.addEventListener("subdomain", (event) => {
       const newSubdomain: SubdomainResult = JSON.parse(event.data);
       setResults(prevResults => [...prevResults, newSubdomain]);
-      setStats(prevStats => ({ total: prevStats.total + 1 }));
+      
+      setStats(prevStats => ({
+        total: prevStats.total + 1,
+        fromWordlist: prevStats.fromWordlist + (newSubdomain.source.includes('wordlist') ? 1 : 0),
+        fromCertificates: prevStats.fromCertificates + (newSubdomain.source.includes('certificate') ? 1 : 0),
+      }));
     });
 
     es.addEventListener("complete", (event) => {
@@ -199,12 +206,20 @@ export default function VerifiedSubdomainFinder() {
         <>
           <Card className="glass-panel">
             <CardContent className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-center">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
                 <div>
                   <div className="text-2xl font-bold text-primary-green">{stats.total}</div>
                   <p className="text-sm text-muted-foreground">Verified Subdomains</p>
                 </div>
+                 <div>
+                  <div className="text-2xl font-bold text-vibrant-green">{stats.fromWordlist}</div>
+                  <p className="text-sm text-muted-foreground">From Wordlist</p>
+                </div>
                 <div>
+                  <div className="text-2xl font-bold text-blue-400">{stats.fromCertificates}</div>
+                  <p className="text-sm text-muted-foreground">From Certificates</p>
+                </div>
+                 <div>
                   <div className="text-2xl font-bold text-red-500">{results.filter(r => r.riskLevel === 'high').length}</div>
                   <p className="text-sm text-muted-foreground">High Risk</p>
                 </div>
