@@ -1,21 +1,11 @@
 "use client"
 
-import { Suspense } from "react"
-import { Canvas } from "@react-three/fiber"
-import { OrbitControls, useGLTF, Environment, Bounds, Html } from "@react-three/drei"
+import { Suspense, useRef } from "react"
+import { Canvas } from "@react-three-fiber/fiber"
+import { useGLTF, Environment, OrbitControls, Bounds } from "@react-three/drei"
+import { motion } from "framer-motion-3d"
+import { useScroll, useTransform } from "framer-motion"
 import { Button } from "@/components/ui/button"
-
-// This is the new loading indicator component
-function ModelLoader() {
-  return (
-    <Html center>
-      <div className="flex flex-col items-center text-primary-green">
-        <div className="w-8 h-8 border-2 border-primary-green border-t-transparent rounded-full animate-spin"></div>
-        <p className="mt-2 font-mono text-sm">Loading Model...</p>
-      </div>
-    </Html>
-  )
-}
 
 // This component loads and displays your 3D model
 function ModelViewer() {
@@ -27,10 +17,39 @@ function ModelViewer() {
 useGLTF.preload("/models/hero-model.glb")
 
 
+// This component contains the 3D scene and the scroll animation logic
+function Scene() {
+  const sceneRef = useRef(null)
+  
+  // Use Framer Motion's useScroll to track scroll progress of the container
+  const { scrollYProgress } = useScroll({
+    target: sceneRef,
+    offset: ["start end", "end start"], // Track from when bottom of viewport hits top of section, to when top of viewport hits bottom of section
+  })
+
+  // Create transformed values based on scroll progress
+  // Model moves up as user scrolls down
+  const y = useTransform(scrollYProgress, [0, 1], [0, 2.5])
+  // Model scales down slightly as user scrolls down
+  const scale = useTransform(scrollYProgress, [0, 1], [1, 0.7])
+  // Model fades out as it moves out of view
+  const opacity = useTransform(scrollYProgress, [0, 0.8, 1], [1, 1, 0])
+
+  return (
+    <motion.group ref={sceneRef} position-y={y} scale={scale} opacity={opacity}>
+      {/* Bounds will auto-center and scale your model to fit the view */}
+      <Bounds fit clip observe margin={1.2}>
+        <ModelViewer />
+      </Bounds>
+    </motion.group>
+  )
+}
+
+
 export default function MrCriminalHero() {
   return (
     <section id="hero" className="relative w-full overflow-hidden bg-[#050807] text-white">
-      {/* Background is now fixed and will not interfere with scrolling */}
+      {/* Background is fixed and will not interfere with scrolling */}
       <div className="pointer-events-none absolute inset-0 z-0">
         <div
           className="absolute inset-0 opacity-30"
@@ -77,27 +96,18 @@ export default function MrCriminalHero() {
         {/* Right Column: 3D Model in a "Box" */}
         <div className="h-[60vh] w-full rounded-2xl border border-primary-green/20 bg-black/20 backdrop-blur-sm p-2">
           <Canvas camera={{ position: [0, 0, 4], fov: 50 }}>
-            {/* Improved lighting for better model appearance */}
+            {/* Improved lighting */}
             <ambientLight intensity={0.5} />
             <Environment preset="city" />
             
-            {/* Suspense shows the loader while the model is loading */}
-            <Suspense fallback={<ModelLoader />}>
-              <Bounds fit clip observe margin={1.2}>
-                <ModelViewer />
-              </Bounds>
+            <Suspense fallback={null}>
+              <Scene />
             </Suspense>
             
-            {/* Controls now have autoRotate enabled */}
-            <OrbitControls 
-              enableZoom={true} 
-              enablePan={false} 
-              autoRotate 
-              autoRotateSpeed={0.8} 
-            />
+            {/* OrbitControls allow users to interact with the model */}
+            <OrbitControls enableZoom={true} enablePan={false} />
           </Canvas>
         </div>
-        
       </div>
     </section>
   )
