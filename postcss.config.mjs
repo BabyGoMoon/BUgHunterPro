@@ -1,8 +1,8 @@
-/** @type {import('postcss-load-config').Config} */
-const config = {
+// Tailwind v4 uses the official PostCSS plugin.
+// No tailwind.config.js is required by default.
+export default {
   plugins: {
-    '@tailwindcss/postcss': {},
+    "@tailwindcss/postcss": {},
+    autoprefixer: {},
   },
-}
-
-export default config
+};
