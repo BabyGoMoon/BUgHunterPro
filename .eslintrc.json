@@ -1,0 +1,11 @@
+{
+  "root": true,
+  "extends": ["next/core-web-vitals"],
+  "parserOptions": {
+    "ecmaVersion": 2023
+  },
+  "rules": {
+    "react/jsx-key": "warn",
+    "no-console": ["warn", { "allow": ["warn", "error"] }]
+  }
+}
