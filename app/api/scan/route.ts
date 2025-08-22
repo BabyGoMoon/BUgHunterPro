@@ -1,27 +1,49 @@
-import type { NextApiRequest, NextApiResponse } from "next";
-import dns from "dns/promises";
+import { NextResponse } from "next/server";
+import { resolve as dnsResolve } from "node:dns/promises";
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
+// Make sure this runs on Node.js (not Edge)
+export const runtime = "nodejs";
+// Avoid static optimization issues
+export const dynamic = "force-dynamic";
 
-  const { domain, wordlist } = req.body;
-  if (!domain || !Array.isArray(wordlist)) {
-    return res.status(400).json({ error: "Invalid input" });
-  }
+type Payload = {
+  domain?: string;
+  wordlist?: string[];
+};
 
-  const found: string[] = [];
+export async function POST(req: Request) {
+  try {
+    const { domain, wordlist }: Payload = await req.json();
 
-  for (const word of wordlist) {
-    const sub = `${word}.${domain}`;
-    try {
-      await dns.resolve(sub);
-      found.push(sub);
-    } catch {
-      // not valid, skip
+    if (!domain || !Array.isArray(wordlist)) {
+      return NextResponse.json({ error: "Invalid input" }, { status: 400 });
     }
-  }
 
-  return res.status(200).json({ results: found });
+    const found: string[] = [];
+
+    // Resolve each candidate subdomain; collect the ones that resolve
+    await Promise.all(
+      wordlist.map(async (word) => {
+        const sub = `${word}.${domain}`;
+        try {
+          await dnsResolve(sub);
+          found.push(sub);
+        } catch {
+          // not valid, skip
+        }
+      })
+    );
+
+    return NextResponse.json({ results: found }, { status: 200 });
+  } catch (err: any) {
+    return NextResponse.json(
+      { error: err?.message ?? "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+// Optional: simple health check
+export async function GET() {
+  return NextResponse.json({ ok: true });
 }
